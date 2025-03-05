@@ -2,12 +2,6 @@ const verifyToken = require('../TokenVerification');
 const router = require('express').Router();
 const Product = require('../models/Products');
 require('dotenv').config();
-const mongoose = require("mongoose");
-const cron = require("node-cron");
-const twilio = require('twilio');
-const client = twilio(process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN);
-console.log("Twilio Client Type:", typeof client);
-console.log("Twilio Config:", process.env.TWILIO_SID, process.env.TWILIO_AUTH_TOKEN, process.env.TWILIO_PHONE);
 
 
 
@@ -18,15 +12,11 @@ router.post("/AddNewProduct", verifyToken, async (req, res) => {
         if (!productname || !productnum || !productEx) {
             return res.status(400).json({ message: "All fields are required" });
         }
-
-        // Check if the product with the same product number already exists for the same user
         const existingProduct = await Product.findOne({ productnum, userid });
 
         if (existingProduct) {
             return res.status(400).json({ message: "Product number already exists for this user." });
         }
-
-        // Create and save the new product
         const newProduct = new Product({
             productname,
             productnum,
@@ -51,51 +41,6 @@ router.post("/AllProduct/:id", verifyToken, async (req, res) => {
     } catch (err) {
         console.error("Error saving product:", err);
         res.status(500).json({ message: "Failed to save product", error: err.message });
-    }
-});
-
-
-
-
-// automatic sending message seciton ********************************************************************
-const adminPhoneNumbers = ["+919961964928"];
-
-// Connect to MongoDB
-mongoose.connect(process.env.mongodbURL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-});
-
-console.log("Scheduled task initialized...");
-
-// minute and hour
-cron.schedule("26 21 * * *", async () => {
-    try {
-
-        const today = new Date().toISOString().split("T")[0];
-        const products = await Product.find({
-            $or: [{ productEx: today }],
-        });
-
-        if (products.length > 0) {
-            const productNames = products.map((p) => p.productname).join(", ");
-
-            // Send SMS to all numbers using Twilio
-            for (const number of adminPhoneNumbers) {
-                console.log(" Sending SMS to:", number);
-                const message = await client.messages.create({
-                    body: messageBody,
-                    from: process.env.TWILIO_PHONE,
-                    to: number,
-                });
-
-                console.log(`SMS Sent Successfully to ${number}:`, message.sid);
-            }
-        } else {
-            console.log("No expiring products today.");
-        }
-    } catch (error) {
-        console.error(" Error in scheduled task:", error.message);
     }
 });
 
